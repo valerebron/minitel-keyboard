@@ -30,6 +30,40 @@ The keyboard is **matrix-based**, meaning it is scanned by sending current throu
 - **RPi.GPIO** library (`pip install RPi.GPIO`)
 - **Adapter** to connect the Minitel keyboard ribbon to GPIO pins (You will have to build yours)
 
+## Cablage
+
+## 3. Vue récapitulative du câblage
+
+Clavier Minitel 1B → Raspberry Pi 3B
+
+8 lignes
+
+| Minitel | Raspberry Pi |
+| ------- | ------------ |
+| 2       | 29 (GPIO 5)  |
+| 3       | 31 (GPIO 6)  |
+| 4       | 32 (GPIO 12) |
+| 5       | 33 (GPIO 13) |
+| C       | 36 (GPIO 16) |
+| D       | 35 (GPIO 19) |
+| E       | 38 (GPIO 20) |
+| F       | 40 (GPIO 21) |
+
+8 colonnes
+
+| Minitel | Raspberry Pi |
+| ------- | ------------ |
+| 1       | 7 (GPIO 4)   |
+| 6       | 11 (GPIO 17) |
+| 7       | 12 (GPIO 18) |
+| 8       | 15 (GPIO 22) |
+| 9       | 16 (GPIO 23) |
+| A       | 18 (GPIO 24) |
+| B       | 22 (GPIO 25) |
+| G       | 13 (GPIO 27) |
+
+Le premier numéro correspond à la broche physique du connecteur 40 broches. Le numéro entre parenthèses correspond au GPIO BCM utilisé dans le programme.
+
 ## Installation
 
 1. Clone this repository or download the files.
