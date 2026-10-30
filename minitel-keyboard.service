@@ -1,0 +1,14 @@
+[Unit]
+Description=Clavier Minitel 1B
+After=multi-user.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/minitel-keyboard
+ExecStart=/usr/bin/python3 /opt/minitel-keyboard/keyboard.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

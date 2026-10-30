@@ -32,10 +32,16 @@ The keyboard is **matrix-based**, meaning it is scanned by sending current throu
 
 ## Cablage
 
-![Minitel mapping](mapping-minitel.jpg)
+![Minitel mapping](mapping-minitel.png)
 ![Raspberry mapping](mapping-raspberry.png)
 
 Clavier Minitel 1B → Raspberry Pi 3B
+
+Masse
+
+| Minitel | Raspberry Pi |
+| ------- | ------------ |
+| 0       | 6 (GND)      |
 
 8 lignes
 

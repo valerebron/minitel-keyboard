@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+SERVICE="minitel-keyboard.service"
+PROJECT_DIR="/opt/minitel-keyboard"
+
+usage() {
+    cat <<'EOF'
+Usage:
+  minitel key start
+  minitel key stop
+  minitel key restart
+  minitel key status
+  minitel key test
+  minitel key calibrate
+  minitel key dump
+EOF
+}
+
+require_root() {
+    if [[ "${EUID}" -ne 0 ]]; then
+        echo "Cette commande nécessite les droits administrateur. Utilisez : sudo minitel key $1" >&2
+        exit 1
+    fi
+}
+
+[[ "${1:-}" == "key" ]] || { usage; exit 2; }
+action="${2:-}"
+[[ -n "${action}" ]] || { usage; exit 2; }
+
+case "${action}" in
+    start)
+        require_root "${action}"
+        exec systemctl start "${SERVICE}"
+        ;;
+    stop)
+        require_root "${action}"
+        exec systemctl stop "${SERVICE}"
+        ;;
+    restart)
+        require_root "${action}"
+        exec systemctl restart "${SERVICE}"
+        ;;
+    status)
+        exec systemctl --no-pager --full status "${SERVICE}"
+        ;;
+    test)
+        require_root "${action}"
+        [[ -f "${PROJECT_DIR}/test_matrix.py" ]] || {
+            echo "Fichier absent : ${PROJECT_DIR}/test_matrix.py" >&2
+            exit 1
+        }
+        exec python3 "${PROJECT_DIR}/test_matrix.py"
+        ;;
+    calibrate)
+        require_root "${action}"
+        [[ -f "${PROJECT_DIR}/calibrate.py" ]] || {
+            echo "Fichier absent : ${PROJECT_DIR}/calibrate.py" >&2
+            exit 1
+        }
+        exec python3 "${PROJECT_DIR}/calibrate.py"
+        ;;
+    dump)
+        [[ -f "${PROJECT_DIR}/mapping.json" ]] || {
+            echo "Fichier absent : ${PROJECT_DIR}/mapping.json" >&2
+            exit 1
+        }
+        exec cat "${PROJECT_DIR}/mapping.json"
+        ;;
+    *)
+        usage
+        exit 2
+        ;;
+esac
