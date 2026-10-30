@@ -1,61 +1,107 @@
-import RPi.GPIO as GPIO
+import json
 import time
-import re
-from evdev import UInput, InputDevice, ecodes as e
-import os
+import RPi.GPIO as GPIO
+from evdev import UInput, ecodes as e
 
-# list of all involved pins (Every GPIO pins, and all special features disabled)
-ALLS = [ 27, 3, 4, 7, 8, 9, 10, 11, 14, 15, 23, 17, 18, 22, 24, 25 ]
-# Pins used to send current
-OUTS = [ 3 , 4, 7, 8, 17, 18, 22, 24 ]
-# Pins used to detect current
-INS=list(set(ALLS) - set(OUTS))
+ROWS = {
+    "2": 5, "3": 6, "4": 12, "5": 13,
+    "C": 16, "D": 19, "E": 20, "F": 21,
+}
 
-keymap = dict()
-for i in ALLS:
-	keymap[i] = dict()
-	for u in ALLS:
-		keymap[i][u] = ""
+COLS = {
+    "1": 4, "6": 17, "7": 18, "8": 22,
+    "9": 23, "A": 24, "B": 25, "G": 27,
+}
 
-def save():
-	keyfile = open("keymap.conf", "w")
-	for i in OUTS:
-	        for u in INS:
-        	        keyfile.write(str(i)+":"+str(u)+"="+keymap[i][u]+"\n")
+MAPPING_FILE = "/opt/minitel-keyboard/mapping.json"
+
+with open(MAPPING_FILE, encoding="utf-8") as f:
+    raw_mapping = json.load(f)
+
+mapping = {}
+for contact, name in raw_mapping.items():
+    code = e.ecodes.get(name)
+    if isinstance(code, int):
+        mapping[contact] = code
+    else:
+        print(f"Touche ignorée : {contact} = {name}")
+
+if not mapping:
+    raise RuntimeError("Aucune touche valide dans mapping.json")
 
 GPIO.setmode(GPIO.BCM)
-ui =  UInput()
+
+for pin in ROWS.values():
+    GPIO.setup(pin, GPIO.OUT, initial=GPIO.LOW)
+
+for pin in COLS.values():
+    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+
+ui = None
+pressed_keys = set()
+stable_contacts = set()
+candidate_contacts = set()
+candidate_count = 0
+
+def scan():
+    contacts = set()
+
+    for row, pin in ROWS.items():
+        GPIO.output(pin, GPIO.HIGH)
+        time.sleep(0.001)
+
+        for col, col_pin in COLS.items():
+            if GPIO.input(col_pin):
+                contacts.add(f"{row}:{col}")
+
+        GPIO.output(pin, GPIO.LOW)
+
+    return contacts
+
 try:
-	keyfile = open("keymap.conf", "r")
-	exp = re.compile("([0-9]+):([0-9]+)=(.+)")
-	for match in exp.finditer(keyfile.read()):
-		keymap[int(match.group(1))][int(match.group(2))]=match.group(3)
-except:
-	print("No keymap detected.")
+    ui = UInput(
+        events={e.EV_KEY: sorted(set(mapping.values()))},
+        name="Minitel 1B",
+        bustype=0x03,
+        vendor=0x0001,
+        product=0x0001,
+    )
 
+    print("Clavier Minitel actif.", flush=True)
 
-for chan in OUTS:
-	GPIO.setup(chan, GPIO.OUT, initial=0)
+    while True:
+        contacts = scan()
 
-for chan in INS:
-	GPIO.setup(chan, GPIO.IN, pull_up_down = GPIO.PUD_DOWN)
+        if contacts == candidate_contacts:
+            candidate_count += 1
+        else:
+            candidate_contacts = contacts
+            candidate_count = 1
 
-try:
-	while True:
-		for out in OUTS:
-			GPIO.output(out, 1)
-			for chan in INS:
-				if GPIO.input(chan) == 1:
-					if keymap[out][chan] != "":
-						ui.write(e.EV_KEY, e.ecodes[keymap[out][chan]], 1)
-						ui.write(e.EV_KEY, e.ecodes[keymap[out][chan]], 0)
-						ui.syn()
-						time.sleep(0.05)
-					else:
-						keymap[out][chan] = input("Unknown keycode, which key did you press ?\n")
-						save()
-			GPIO.output(out, 0)
-			time.sleep(0.01)
+        # Filtre anti-rebond : 3 lectures identiques
+        if candidate_count >= 3 and contacts != stable_contacts:
+            new_keys = {
+                mapping[c] for c in contacts if c in mapping
+            }
+            old_keys = {
+                mapping[c] for c in stable_contacts if c in mapping
+            }
+
+            for key in old_keys - new_keys:
+                ui.write(e.EV_KEY, key, 0)
+
+            for key in new_keys - old_keys:
+                ui.write(e.EV_KEY, key, 1)
+
+            if old_keys != new_keys:
+                ui.syn()
+
+            stable_contacts = contacts
+
+        time.sleep(0.005)
+
 finally:
-	GPIO.cleanup()
-	ui.close()
+    if ui is not None:
+        ui.close()
+
+    GPIO.cleanup()
